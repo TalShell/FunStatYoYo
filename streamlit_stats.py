@@ -18,9 +18,23 @@ all_subjects=['النشاط العلمي ',
     
 selected_feature="Moyenne Gen"
 
-
 useful_col=first_last_name+all_subjects
 st.title("YouyouStats, what else!")
+
+def getGenderColumnName(df):
+    f=""
+    g=""
+    colGender="BadValue"
+    if 'Genre' in df.columns:
+        colGender = "Genre"
+        g= "Garçon"
+        f= "Fille"
+    elif 'الجنس' in df.columns:
+        colGender = "الجنس"
+        g="ذكر"
+        f="أنثى"
+
+    return f,g,colGender
 
 def getComparisonFeature(df):
     if st.checkbox("Choisisez un seul critere pour le choix des groupes."):
@@ -28,7 +42,7 @@ def getComparisonFeature(df):
         criteria = list(df.select_dtypes(include=['float64']).columns)
         criterion = st.selectbox("", criteria)
         return criterion
-    return "Moyenne Gen"
+    return list(df.select_dtypes(include=['float64']).columns)[0]
 
 def getTaskType():
     # Select columns to display
@@ -82,16 +96,17 @@ def group_split(df, grp_pct=.5, seed=5145):
     grp2 = df.iloc[perm[train_end:validate_end]]
     return grp1,grp2
 
-def isParityBroken(grp):
-    return grp['Genre'].value_counts(ascending=True)[0] - grp['Genre'].value_counts(ascending=True)[0] <2
+def isParityBroken(grp,colGender="Bad"):
+    return grp[colGender].value_counts(ascending=True)[0] - grp[colGender].value_counts(ascending=True)[0] <2
     
 def getBestSplit(df,selected_feature,KeepParity=True):
     best_std=10
     best_mean=100
     best_seed = 0
+    _,_,colGender = getGenderColumnName(df)
     for seed in range(12,100,1):
         grp1, grp2 = group_split(df,grp_pct=0.5,seed=seed)
-        if KeepParity and (isParityBroken(grp1) or isParityBroken(grp2)):
+        if KeepParity and (isParityBroken(grp1,colGender) or isParityBroken(grp2,colGender)):
             pass 
         std = abs(grp1[selected_feature].std()-grp2[selected_feature].std())
         mean = abs(grp1[selected_feature].mean()-grp2[selected_feature].mean())
@@ -117,7 +132,7 @@ if uploaded_file is not None:
             csv = pd.read_csv(uploaded_file)
             return csv
         elif "xls" in uploaded_file.name:
-            df = pd.read_excel (uploaded_file,skiprows=9)
+            df = pd.read_excel (uploaded_file)
             df.columns=[i.replace("\n","") for i in df.columns]
             df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
             return df
@@ -206,28 +221,18 @@ if uploaded_file is not None:
         st.write(df[selected_feature].describe())
         df[selected_feature].describe().to_excel(writer, sheet_name="données", startrow=4+len(df.index), startcol=2)
 
-        plotDensity(df,selected_feature,"Densité des notes ("+selected_feature+") du groupe entier",name_fig="GlobalDensity.png")
-       
-
-        if 'Genre' in df.columns:
-            colGender = "Genre"
-            g= "Garçon"
-            f= "Fille"
-        elif ' arabic stuf' in df.columns:
-            colGender = " arabic "
-            g=" garcon in arabic"
-            f=" fille in arabic"
-        else:
-            colGender=""
+        plotDensity(df,selected_feature,"Densité des notes ("+get_display(arabic_reshaper.reshape(selected_feature))+") du groupe entier",name_fig="GlobalDensity.png")
+        f,g,colGender = getGenderColumnName(df)
         if colGender !="":
             plotDensity2(df[df[colGender]==f][selected_feature],
-                df[df[colGender]!=f][selected_feature],g,f,
-                title="Densité des notes ("+selected_feature+") du groupe par genre",name_fig="GenreDensity.png")
+                df[df[colGender]!=f][selected_feature],get_display(arabic_reshaper.reshape(g)),get_display(arabic_reshaper.reshape(f)),
+                title="Densité des notes ("+get_display(arabic_reshaper.reshape(selected_feature))+") du groupe par genre",name_fig="GenreDensity.png")
 
         st.header('** Création de 2 groupes homogènes **')
         KeepParity =True
         if st.checkbox("Cochez ici si vous voulez ignorer la parité fille/garcon"):
             KeepParity = False
+
         grp1,grp2 = getBestSplit(df,selected_feature,KeepParity)
         st.write("*Groupe 1:*")
         st.write(grp1)
@@ -237,7 +242,7 @@ if uploaded_file is not None:
         st.write(getDescription(grp2,selected_feature))
         # Plot both kde
         plotDensity2(grp2[selected_feature],grp1[selected_feature],"Groupe 1","Groupe 2",
-            title="Densité des notes ("+selected_feature+") des groupes constitués",name_fig="GroupsDensity.png")
+            title="Densité des notes ("+get_display(arabic_reshaper.reshape(selected_feature))+") des groupes constitués",name_fig="GroupsDensity.png")
         download=st.button('Télécharger')
         if download:
             grp1.to_excel(writer, sheet_name="Groupes",index=False,startrow=2, startcol=2)

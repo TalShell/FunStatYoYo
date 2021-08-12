@@ -1,6 +1,8 @@
 numpy
 pandas
 streamlit
-python3-matplotlib
+matplotlib
 arabic_reshaper
-bidi.algorithm
+python-bidi
+xlsxwriter
+scipy
